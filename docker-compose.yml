@@ -1,0 +1,70 @@
+version: "3.9"
+services:
+  api:
+    build: sqlgpt-express
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - PG_URL=${PG_URL}
+      - PORT=${PORT:-8080}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CARDS_TTL_SECONDS=${CARDS_TTL_SECONDS:-900}
+      - STATEMENT_TIMEOUT_MS=${STATEMENT_TIMEOUT_MS:-3000}
+      - MAX_LIMIT=${MAX_LIMIT:-1000}
+      - MOCK_LLM=${MOCK_LLM:-0}
+      - MAX_RESPONSE_BYTES=${MAX_RESPONSE_BYTES:-5242880}
+    ports:
+      - "${PORT:-8080}:8080"
+    depends_on:
+      - db
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=demo
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=100"]
+  demo-seed:
+    image: postgres:16
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=postgres
+    entrypoint: ["bash", "-lc"]
+    command: >
+      "psql -h db -U postgres -d demo -v ON_ERROR_STOP=1 <<'SQL'\n
+      CREATE TABLE IF NOT EXISTS public.customers(
+        id serial primary key,
+        email text not null,
+        city text
+      );
+      CREATE TABLE IF NOT EXISTS public.orders(
+        id serial primary key,
+        customer_id int references public.customers(id),
+        total_cents int not null,
+        paid boolean default true,
+        created_at timestamptz default now()
+      );
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='app_ro') THEN
+          CREATE ROLE app_ro LOGIN PASSWORD 'app_ro_pass';
+        END IF;
+      END $$;
+      GRANT CONNECT ON DATABASE demo TO app_ro;
+      GRANT USAGE ON SCHEMA public TO app_ro;
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_ro;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO app_ro;
+      SQL"
+volumes:
+  pgdata: {}
+
