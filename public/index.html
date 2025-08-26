@@ -9,7 +9,12 @@
       label { display:block; margin-top: 1rem; font-weight: 600; }
       input, textarea { width: 100%; max-width: 900px; padding: 0.5rem; font: inherit; }
       button { margin-top: 1rem; padding: 0.5rem 0.8rem; font: inherit; }
-      pre { background: #f6f8fa; padding: 1rem; overflow: auto; max-width: 90vw; }
+      .muted { color: #6b7280; }
+      .meta { margin-top: 1rem; font-size: 14px; }
+      .meta code { background: #f6f8fa; padding: 2px 4px; border-radius: 4px; }
+      table { border-collapse: collapse; margin-top: 1rem; max-width: 95vw; }
+      th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 14px; }
+      thead { background: #f3f4f6; }
     </style>
   </head>
   <body>
@@ -27,11 +32,48 @@
     </form>
 
     <h2>Resultado</h2>
-    <pre id="out">(ainda sem resposta)</pre>
+    <div id="out" class="muted">(ainda sem resposta)</div>
 
     <script>
       const form = document.getElementById('qform');
       const out = document.getElementById('out');
+
+      function renderResult(rows, sql, rowCount) {
+        if (!Array.isArray(rows)) {
+          out.textContent = 'Resposta inesperada do servidor.';
+          return;
+        }
+        if (rows.length === 0) {
+          const meta = `<div class="meta"><strong>Linhas:</strong> 0</div>` +
+                       (sql ? `<div class="meta"><strong>SQL:</strong> <code>${escape(sql)}</code></div>` : '');
+          out.innerHTML = meta + '<div class="muted">Sem resultados.</div>';
+          return;
+        }
+        // Collect columns from union of keys
+        const cols = Array.from(rows.reduce((set, r) => {
+          Object.keys(r || {}).forEach(k => set.add(k));
+          return set;
+        }, new Set())).sort();
+
+        const escape = (s) => String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        const meta = `<div class="meta"><strong>Linhas:</strong> ${rowCount ?? rows.length}</div>` +
+                     (sql ? `<div class="meta"><strong>SQL:</strong> <code>${escape(sql)}</code></div>` : '');
+        let html = meta + '<table><thead><tr>' + cols.map(c => `<th>${escape(c)}</th>`).join('') + '</tr></thead><tbody>';
+        for (const r of rows) {
+          html += '<tr>' + cols.map(c => {
+            let v = r?.[c];
+            if (v === null || v === undefined) v = '';
+            else if (typeof v === 'object') v = JSON.stringify(v);
+            return `<td>${escape(v)}</td>`;
+          }).join('') + '</tr>';
+        }
+        html += '</tbody></table>';
+        out.innerHTML = html;
+      }
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         out.textContent = 'Carregando...';
@@ -45,9 +87,20 @@
           });
           const text = await res.text();
           let parsed;
-          try { parsed = JSON.parse(text); }
-          catch { parsed = { raw: text }; }
-          out.textContent = JSON.stringify(parsed, null, 2);
+          try { parsed = JSON.parse(text); } catch (e) {
+            out.textContent = 'Erro ao interpretar a resposta.';
+            return;
+          }
+          if (!res.ok) {
+            const msg = parsed && parsed.error ? parsed.error : 'Erro na requisição';
+            out.textContent = 'Erro: ' + msg;
+            return;
+          }
+          if (parsed && Array.isArray(parsed.rows)) {
+            renderResult(parsed.rows, parsed.sql, parsed.rowCount);
+          } else {
+            out.textContent = 'Resposta sem linhas.';
+          }
         } catch (err) {
           out.textContent = 'Erro: ' + (err && err.message ? err.message : String(err));
         }
