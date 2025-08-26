@@ -27,7 +27,7 @@ Prereqs: Bun installed, Postgres URL.
 bun install
 bun run dev
 
-curl -s localhost:8080/query \
+curl -s localhost:7679/query \
   -H 'content-type: application/json' \
   -d '{"phrase":"last 10 paid orders with emails","dbUrl":"postgres://user:pass@host:5432/db"}' | jq .
 ```
