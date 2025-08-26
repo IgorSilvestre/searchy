@@ -41,7 +41,7 @@ PG_URL=postgres://readonly@host:5432/db   # optional default
 CARDS_TTL_SECONDS=900
 STATEMENT_TIMEOUT_MS=3000
 MAX_LIMIT=1000
-PORT=8080
+PORT=7679
 LOG_LEVEL=info
 MOCK_LLM=0            # set to 1 in tests/dev to avoid network
 MAX_RESPONSE_BYTES=5242880
@@ -55,14 +55,14 @@ Notes:
 
 ```
 docker build -t sqlgpt-express .
-docker run --rm -p 8080:8080 -e OPENAI_API_KEY=$OPENAI_API_KEY sqlgpt-express
+docker run --rm -p 7679:7679 -e OPENAI_API_KEY=$OPENAI_API_KEY sqlgpt-express
 ```
 
 Compose with demo Postgres and seed:
 
 ```
 docker-compose up --build
-# API on :8080; DB on :5432; read-only role: app_ro/app_ro_pass
+# API on :7679; DB on :5432; read-only role: app_ro/app_ro_pass
 ```
 
 ## Endpoint
