@@ -3,50 +3,134 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Searchy – Cliente Minimal</title>
+    <title>Searchy – Minimal Client</title>
     <style>
       body { font-family: system-ui, sans-serif; margin: 2rem; }
       label { display:block; margin-top: 1rem; font-weight: 600; }
-      input, textarea { width: 100%; max-width: 900px; padding: 0.5rem; font: inherit; }
-      button { margin-top: 1rem; padding: 0.5rem 0.8rem; font: inherit; }
+      input { width: 100%; max-width: 900px; padding: 0.5rem; font: inherit; }
+      button { margin-top: 1rem; padding: 0.45rem 0.8rem; font: inherit; cursor: pointer; }
       .muted { color: #6b7280; }
       .meta { margin-top: 1rem; font-size: 14px; }
       .meta code { background: #f6f8fa; padding: 2px 4px; border-radius: 4px; }
       table { border-collapse: collapse; margin-top: 1rem; max-width: 95vw; }
       th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 14px; }
       thead { background: #f3f4f6; }
+      header { display:flex; gap: 12px; align-items: center; justify-content: space-between; max-width: 900px; }
     </style>
   </head>
   <body>
-    <h1>Searchy</h1>
-    <p>Informe uma frase e a URL de conexão do Postgres. O JSON da resposta aparece abaixo.</p>
+    <header>
+      <h1 style="margin: 0;">Searchy</h1>
+      <button id="langBtn" type="button">Português</button>
+    </header>
+    <p id="intro">Enter a phrase and a Postgres connection URL. The result table appears below.</p>
 
     <form id="qform">
-      <label for="phrase">Frase</label>
-      <input id="phrase" name="phrase" placeholder="ex.: últimos 10 pedidos pagos com e-mails" required />
+      <label for="phrase" id="phraseLabel">Phrase</label>
+      <input id="phrase" name="phrase" placeholder="e.g. last 10 paid orders with emails" required />
 
-      <label for="dbUrl">dbUrl</label>
-      <input id="dbUrl" name="dbUrl" placeholder="postgres://usuario:senha@host:5432/banco" />
+      <label for="dbUrl" id="dbUrlLabel">dbUrl</label>
+      <input id="dbUrl" name="dbUrl" placeholder="postgres://user:pass@host:5432/db" />
 
-      <button type="submit">Executar</button>
+      <button id="runBtn" type="submit">Run</button>
     </form>
 
-    <h2>Resultado</h2>
-    <div id="out" class="muted">(ainda sem resposta)</div>
+    <h2 id="resultHeader">Result</h2>
+    <div id="out" class="muted">(no response yet)</div>
 
     <script>
       const form = document.getElementById('qform');
       const out = document.getElementById('out');
+      const langBtn = document.getElementById('langBtn');
+      const runBtn = document.getElementById('runBtn');
+      const phraseInput = document.getElementById('phrase');
+      const dbUrlInput = document.getElementById('dbUrl');
+      const phraseLabel = document.getElementById('phraseLabel');
+      const dbUrlLabel = document.getElementById('dbUrlLabel');
+      const resultHeader = document.getElementById('resultHeader');
+      const intro = document.getElementById('intro');
+
+      const i18n = {
+        en: {
+          title: 'Searchy – Minimal Client',
+          intro: 'Enter a phrase and a Postgres connection URL. The result table appears below.',
+          phraseLabel: 'Phrase',
+          phrasePh: 'e.g. last 10 paid orders with emails',
+          dbUrlLabel: 'dbUrl',
+          dbUrlPh: 'postgres://user:pass@host:5432/db',
+          run: 'Run',
+          resultHeader: 'Result',
+          noResp: '(no response yet)',
+          loading: 'Loading...',
+          unexpected: 'Unexpected server response.',
+          noRows: 'No results.',
+          errPrefix: 'Error: ',
+          parseErr: 'Failed to parse response.',
+          rowsLabel: 'Rows:',
+          sqlLabel: 'SQL:',
+          langToggle: 'Português'
+        },
+        pt: {
+          title: 'Searchy – Cliente Minimal',
+          intro: 'Informe uma frase e a URL de conexão do Postgres. A tabela de resultados aparece abaixo.',
+          phraseLabel: 'Frase',
+          phrasePh: 'ex.: últimos 10 pedidos pagos com e-mails',
+          dbUrlLabel: 'dbUrl',
+          dbUrlPh: 'postgres://usuario:senha@host:5432/banco',
+          run: 'Executar',
+          resultHeader: 'Resultado',
+          noResp: '(ainda sem resposta)',
+          loading: 'Carregando...',
+          unexpected: 'Resposta inesperada do servidor.',
+          noRows: 'Sem resultados.',
+          errPrefix: 'Erro: ',
+          parseErr: 'Erro ao interpretar a resposta.',
+          rowsLabel: 'Linhas:',
+          sqlLabel: 'SQL:',
+          langToggle: 'English'
+        }
+      };
+
+      let lang = 'en';
+
+      function applyLang() {
+        const t = i18n[lang];
+        document.title = t.title;
+        intro.textContent = t.intro;
+        phraseLabel.textContent = t.phraseLabel;
+        phraseInput.placeholder = t.phrasePh;
+        dbUrlLabel.textContent = t.dbUrlLabel;
+        dbUrlInput.placeholder = t.dbUrlPh;
+        runBtn.textContent = t.run;
+        resultHeader.textContent = t.resultHeader;
+        langBtn.textContent = t.langToggle;
+        if (out.classList.contains('muted')) {
+          out.textContent = t.noResp;
+        }
+      }
+
+      langBtn.addEventListener('click', () => {
+        lang = lang === 'en' ? 'pt' : 'en';
+        applyLang();
+      });
+
+      applyLang();
+
+      const escape = (s) => String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 
       function renderResult(rows, sql, rowCount) {
+        const t = i18n[lang];
         if (!Array.isArray(rows)) {
-          out.textContent = 'Resposta inesperada do servidor.';
+          out.textContent = t.unexpected;
           return;
         }
         if (rows.length === 0) {
-          const meta = `<div class="meta"><strong>Linhas:</strong> 0</div>` +
-                       (sql ? `<div class="meta"><strong>SQL:</strong> <code>${escape(sql)}</code></div>` : '');
-          out.innerHTML = meta + '<div class="muted">Sem resultados.</div>';
+          const meta = `<div class="meta"><strong>${t.rowsLabel}</strong> 0</div>` +
+                       (sql ? `<div class="meta"><strong>${t.sqlLabel}</strong> <code>${escape(sql)}</code></div>` : '');
+          out.innerHTML = meta + `<div class="muted">${t.noRows}</div>`;
           return;
         }
         // Collect columns from union of keys
@@ -55,13 +139,8 @@
           return set;
         }, new Set())).sort();
 
-        const escape = (s) => String(s)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-
-        const meta = `<div class="meta"><strong>Linhas:</strong> ${rowCount ?? rows.length}</div>` +
-                     (sql ? `<div class="meta"><strong>SQL:</strong> <code>${escape(sql)}</code></div>` : '');
+        const meta = `<div class="meta"><strong>${t.rowsLabel}</strong> ${rowCount ?? rows.length}</div>` +
+                     (sql ? `<div class="meta"><strong>${t.sqlLabel}</strong> <code>${escape(sql)}</code></div>` : '');
         let html = meta + '<table><thead><tr>' + cols.map(c => `<th>${escape(c)}</th>`).join('') + '</tr></thead><tbody>';
         for (const r of rows) {
           html += '<tr>' + cols.map(c => {
@@ -73,10 +152,14 @@
         }
         html += '</tbody></table>';
         out.innerHTML = html;
+        out.classList.remove('muted');
       }
+
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        out.textContent = 'Carregando...';
+        const t = i18n[lang];
+        out.textContent = t.loading;
+        out.classList.add('muted');
         const phrase = document.getElementById('phrase').value;
         const dbUrl = document.getElementById('dbUrl').value || undefined;
         try {
@@ -88,23 +171,24 @@
           const text = await res.text();
           let parsed;
           try { parsed = JSON.parse(text); } catch (e) {
-            out.textContent = 'Erro ao interpretar a resposta.';
+            out.textContent = t.parseErr;
             return;
           }
           if (!res.ok) {
-            const msg = parsed && parsed.error ? parsed.error : 'Erro na requisição';
-            out.textContent = 'Erro: ' + msg;
+            const msg = parsed && parsed.error ? parsed.error : 'Request error';
+            out.textContent = t.errPrefix + msg;
             return;
           }
           if (parsed && Array.isArray(parsed.rows)) {
             renderResult(parsed.rows, parsed.sql, parsed.rowCount);
           } else {
-            out.textContent = 'Resposta sem linhas.';
+            out.textContent = t.noRows;
           }
         } catch (err) {
-          out.textContent = 'Erro: ' + (err && err.message ? err.message : String(err));
+          out.textContent = i18n[lang].errPrefix + (err && err.message ? err.message : String(err));
         }
       });
     </script>
   </body>
   </html>
+
