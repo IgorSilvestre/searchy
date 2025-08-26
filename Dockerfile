@@ -13,7 +13,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/dist ./dist
+COPY public ./public
 COPY package.json ./package.json
 EXPOSE 8080
 CMD ["bun", "run", "dist/server.js"]
-

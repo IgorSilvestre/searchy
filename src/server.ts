@@ -32,6 +32,8 @@ function getAdapter(dbUrl: string): IntrospectionAdapter {
 export function createApp() {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
+  // Serve minimal static client from /public
+  app.use(express.static("public"));
 
   app.get("/healthz", (_req, res) => res.json({ ok: true }));
 
@@ -115,4 +117,3 @@ if (import.meta.main) {
     logger.info("server_listening", { port: PORT });
   });
 }
-

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Searchy – Minimal Client</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; }
+      label { display:block; margin-top: 1rem; font-weight: 600; }
+      input, textarea { width: 100%; max-width: 900px; padding: 0.5rem; font: inherit; }
+      button { margin-top: 1rem; padding: 0.5rem 0.8rem; font: inherit; }
+      pre { background: #f6f8fa; padding: 1rem; overflow: auto; max-width: 90vw; }
+    </style>
+  </head>
+  <body>
+    <h1>Searchy</h1>
+    <p>Enter a phrase and a Postgres connection URL. Response JSON prints below.</p>
+
+    <form id="qform">
+      <label for="phrase">Phrase</label>
+      <input id="phrase" name="phrase" placeholder="e.g. last 10 paid orders with emails" required />
+
+      <label for="dbUrl">dbUrl</label>
+      <input id="dbUrl" name="dbUrl" placeholder="postgres://user:pass@host:5432/db" />
+
+      <button type="submit">Run</button>
+    </form>
+
+    <h2>Result</h2>
+    <pre id="out">(no response yet)</pre>
+
+    <script>
+      const form = document.getElementById('qform');
+      const out = document.getElementById('out');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        out.textContent = 'Loading...';
+        const phrase = document.getElementById('phrase').value;
+        const dbUrl = document.getElementById('dbUrl').value || undefined;
+        try {
+          const res = await fetch('/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phrase, dbUrl })
+          });
+          const text = await res.text();
+          let parsed;
+          try { parsed = JSON.parse(text); }
+          catch { parsed = { raw: text }; }
+          out.textContent = JSON.stringify(parsed, null, 2);
+        } catch (err) {
+          out.textContent = 'Error: ' + (err && err.message ? err.message : String(err));
+        }
+      });
+    </script>
+  </body>
+  </html>
+
