@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Searchy – Minimal Client</title>
+    <title>Searchy – Cliente Minimal</title>
     <style>
       body { font-family: system-ui, sans-serif; margin: 2rem; }
       label { display:block; margin-top: 1rem; font-weight: 600; }
@@ -14,27 +14,27 @@
   </head>
   <body>
     <h1>Searchy</h1>
-    <p>Enter a phrase and a Postgres connection URL. Response JSON prints below.</p>
+    <p>Informe uma frase e a URL de conexão do Postgres. O JSON da resposta aparece abaixo.</p>
 
     <form id="qform">
-      <label for="phrase">Phrase</label>
-      <input id="phrase" name="phrase" placeholder="e.g. last 10 paid orders with emails" required />
+      <label for="phrase">Frase</label>
+      <input id="phrase" name="phrase" placeholder="ex.: últimos 10 pedidos pagos com e-mails" required />
 
       <label for="dbUrl">dbUrl</label>
-      <input id="dbUrl" name="dbUrl" placeholder="postgres://user:pass@host:5432/db" />
+      <input id="dbUrl" name="dbUrl" placeholder="postgres://usuario:senha@host:5432/banco" />
 
-      <button type="submit">Run</button>
+      <button type="submit">Executar</button>
     </form>
 
-    <h2>Result</h2>
-    <pre id="out">(no response yet)</pre>
+    <h2>Resultado</h2>
+    <pre id="out">(ainda sem resposta)</pre>
 
     <script>
       const form = document.getElementById('qform');
       const out = document.getElementById('out');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        out.textContent = 'Loading...';
+        out.textContent = 'Carregando...';
         const phrase = document.getElementById('phrase').value;
         const dbUrl = document.getElementById('dbUrl').value || undefined;
         try {
@@ -49,10 +49,9 @@
           catch { parsed = { raw: text }; }
           out.textContent = JSON.stringify(parsed, null, 2);
         } catch (err) {
-          out.textContent = 'Error: ' + (err && err.message ? err.message : String(err));
+          out.textContent = 'Erro: ' + (err && err.message ? err.message : String(err));
         }
       });
     </script>
   </body>
   </html>
-
