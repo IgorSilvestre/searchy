@@ -1,4 +1,4 @@
-# sqlgpt-express
+# Searchy
 
 Plug-and-play NL→SQL API. ExpressJS + TypeScript, Bun, Postgres-first with an adapter interface for future databases. It exposes a single REST endpoint that takes a natural-language phrase, generates a safe SELECT-only SQL using an LLM (OpenAI-compatible JSON mode), executes it with guardrails, and returns JSON rows.
 
