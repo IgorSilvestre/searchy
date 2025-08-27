@@ -35,22 +35,38 @@ export class OpenAILLM implements LLM {
   async generateSQL(phrase: string, cards: RelationCard[], cardNames: string[]): Promise<LLMResult> {
     const sys = SYSTEM_PROMPT_TEMPLATE(cardNames, JSON.stringify(cards));
     // Use fetch to OpenAI-compatible endpoint
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: phrase },
-        ],
-      }),
+    const makeBody = (withTemperature: boolean) => ({
+      model: this.model,
+      ...(withTemperature ? { temperature: 0 } : {}),
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: phrase },
+      ],
     });
+
+    const doRequest = async (withTemperature: boolean) => {
+      return fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(makeBody(withTemperature)),
+      });
+    };
+
+    // First try with temperature: 0 (deterministic). If the model rejects
+    // the temperature parameter, retry without it (default = 1).
+    let resp = await doRequest(true);
+    if (!resp.ok) {
+      let errorJson: any = undefined;
+      try { errorJson = await resp.json(); } catch { /* fall back to text below */ }
+      const isTempUnsupported = !!(errorJson && errorJson.error && errorJson.error.code === "unsupported_value" && errorJson.error.param === "temperature");
+      if (isTempUnsupported) {
+        resp = await doRequest(false);
+      }
+    }
     if (!resp.ok) {
       const t = await resp.text();
       throw new Error(`LLM error: ${resp.status} ${t}`);
