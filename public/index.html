@@ -16,6 +16,19 @@
       th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 14px; }
       thead { background: #f3f4f6; }
       header { display:flex; gap: 12px; align-items: center; justify-content: space-between; max-width: 900px; }
+      /* Tabs */
+      .tabs { display: flex; gap: 8px; margin-top: 1rem; }
+      .tab-btn { border: 1px solid #d1d5db; background: #f9fafb; padding: 6px 10px; border-radius: 6px; }
+      .tab-btn.active { background: #111827; color: white; border-color: #111827; }
+      .tab { display: none; max-width: 900px; }
+      .tab.active { display: block; }
+      /* Chat */
+      .chat { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fafafa; max-width: 900px; margin-top: 8px; }
+      .msg { margin: 6px 0; padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; }
+      .msg.user { background: #e0f2fe; }
+      .msg.assistant { background: #ecfdf5; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .row input { flex: 1; }
     </style>
   </head>
   <body>
@@ -25,18 +38,38 @@
     </header>
     <p id="intro">Enter a phrase and a Postgres connection URL. The result table appears below.</p>
 
-    <form id="qform">
-      <label for="phrase" id="phraseLabel">Phrase</label>
-      <input id="phrase" name="phrase" placeholder="e.g. last 10 paid orders with emails" required />
+    <div class="tabs">
+      <button id="tabQueryBtn" class="tab-btn active" type="button">Query</button>
+      <button id="tabExplainBtn" class="tab-btn" type="button">Explain</button>
+    </div>
 
-      <label for="dbUrl" id="dbUrlLabel">dbUrl</label>
-      <input id="dbUrl" name="dbUrl" placeholder="postgres://user:pass@host:5432/db" />
+    <section id="queryTab" class="tab active">
+      <form id="qform">
+        <label for="phrase" id="phraseLabel">Phrase</label>
+        <input id="phrase" name="phrase" placeholder="e.g. last 10 paid orders with emails" required />
 
-      <button id="runBtn" type="submit">Run</button>
-    </form>
+        <label for="dbUrl" id="dbUrlLabel">dbUrl</label>
+        <input id="dbUrl" name="dbUrl" placeholder="postgres://user:pass@host:5432/db" />
 
-    <h2 id="resultHeader">Result</h2>
-    <div id="out" class="muted">(no response yet)</div>
+        <button id="runBtn" type="submit">Run</button>
+      </form>
+
+      <h2 id="resultHeader">Result</h2>
+      <div id="out" class="muted">(no response yet)</div>
+    </section>
+
+    <section id="explainTab" class="tab">
+      <div class="meta" style="margin-bottom:8px;">Ask questions about your schema/relations. Previous Q&amp;A is sent as context.</div>
+      <label for="dbUrl2" id="dbUrl2Label">dbUrl</label>
+      <input id="dbUrl2" name="dbUrl2" placeholder="postgres://user:pass@host:5432/db" />
+
+      <div id="chat" class="chat" aria-live="polite"></div>
+      <form id="eform" class="row">
+        <input id="eq" name="eq" placeholder="e.g. how do orders link to customers?" />
+        <button id="askBtn" type="submit">Ask</button>
+        <button id="clearBtn" type="button">Clear chat</button>
+      </form>
+    </section>
 
     <script>
       const form = document.getElementById('qform');
@@ -47,8 +80,18 @@
       const dbUrlInput = document.getElementById('dbUrl');
       const phraseLabel = document.getElementById('phraseLabel');
       const dbUrlLabel = document.getElementById('dbUrlLabel');
+      const dbUrl2Input = document.getElementById('dbUrl2');
+      const dbUrl2Label = document.getElementById('dbUrl2Label');
       const resultHeader = document.getElementById('resultHeader');
       const intro = document.getElementById('intro');
+      const tabQueryBtn = document.getElementById('tabQueryBtn');
+      const tabExplainBtn = document.getElementById('tabExplainBtn');
+      const queryTab = document.getElementById('queryTab');
+      const explainTab = document.getElementById('explainTab');
+      const chatEl = document.getElementById('chat');
+      const eform = document.getElementById('eform');
+      const eqInput = document.getElementById('eq');
+      const clearBtn = document.getElementById('clearBtn');
 
       const i18n = {
         en: {
@@ -58,6 +101,12 @@
           phrasePh: 'e.g. last 10 paid orders with emails',
           dbUrlLabel: 'dbUrl',
           dbUrlPh: 'postgres://user:pass@host:5432/db',
+          dbUrl2Label: 'dbUrl',
+          ask: 'Ask',
+          clearChat: 'Clear chat',
+          explainTab: 'Explain',
+          queryTab: 'Query',
+          askPh: 'e.g. how do orders link to customers?',
           run: 'Run',
           resultHeader: 'Result',
           noResp: '(no response yet)',
@@ -77,6 +126,12 @@
           phrasePh: 'ex.: últimos 10 pedidos pagos com e-mails',
           dbUrlLabel: 'dbUrl',
           dbUrlPh: 'postgres://usuario:senha@host:5432/banco',
+          dbUrl2Label: 'dbUrl',
+          ask: 'Perguntar',
+          clearChat: 'Limpar conversa',
+          explainTab: 'Explicar',
+          queryTab: 'Consulta',
+          askPh: 'ex.: como pedidos se ligam a clientes?',
           run: 'Executar',
           resultHeader: 'Resultado',
           noResp: '(ainda sem resposta)',
@@ -101,9 +156,16 @@
         phraseInput.placeholder = t.phrasePh;
         dbUrlLabel.textContent = t.dbUrlLabel;
         dbUrlInput.placeholder = t.dbUrlPh;
+        dbUrl2Label.textContent = t.dbUrl2Label;
+        dbUrl2Input.placeholder = t.dbUrlPh;
         runBtn.textContent = t.run;
         resultHeader.textContent = t.resultHeader;
         langBtn.textContent = t.langToggle;
+        tabQueryBtn.textContent = t.queryTab;
+        tabExplainBtn.textContent = t.explainTab;
+        eqInput.placeholder = t.askPh;
+        document.getElementById('askBtn').textContent = t.ask;
+        clearBtn.textContent = t.clearChat;
         if (out.classList.contains('muted')) {
           out.textContent = t.noResp;
         }
@@ -155,6 +217,106 @@
         out.classList.remove('muted');
       }
 
+      // Tabs
+      function setActiveTab(which) {
+        if (which === 'query') {
+          queryTab.classList.add('active');
+          explainTab.classList.remove('active');
+          tabQueryBtn.classList.add('active');
+          tabExplainBtn.classList.remove('active');
+        } else {
+          queryTab.classList.remove('active');
+          explainTab.classList.add('active');
+          tabQueryBtn.classList.remove('active');
+          tabExplainBtn.classList.add('active');
+        }
+      }
+      tabQueryBtn.addEventListener('click', () => setActiveTab('query'));
+      tabExplainBtn.addEventListener('click', () => { setActiveTab('explain'); loadChat(); });
+
+      // Explain chat
+      const STORAGE_KEY = 'searchy_explain_chat_v1';
+      let chatHistory = [];
+      function appendMsg(role, text) {
+        const div = document.createElement('div');
+        div.className = 'msg ' + role;
+        div.textContent = text;
+        chatEl.appendChild(div);
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+      function renderChatFromHistory() {
+        chatEl.innerHTML = '';
+        for (const m of chatHistory) appendMsg(m.role, m.content);
+      }
+      function saveChat() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory)); } catch {}
+      }
+      function loadChat() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          chatHistory = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(chatHistory)) chatHistory = [];
+        } catch { chatHistory = []; }
+        renderChatFromHistory();
+      }
+      function buildContext() {
+        let ctx = '';
+        for (const t of chatHistory) {
+          if (t.role === 'user') ctx += `Q: ${t.content}\n`;
+          else if (t.role === 'assistant') ctx += `A: ${t.content}\n`;
+        }
+        return ctx.trim();
+      }
+      eform.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const q = eqInput.value.trim();
+        if (!q) return;
+        const dbUrl = (dbUrl2Input.value || dbUrlInput.value || '').trim() || undefined;
+        chatHistory.push({ role: 'user', content: q });
+        appendMsg('user', q);
+        saveChat();
+        eqInput.value = '';
+        const thinking = document.createElement('div');
+        thinking.className = 'msg assistant muted';
+        thinking.textContent = i18n[lang].loading;
+        chatEl.appendChild(thinking);
+        try {
+          const context = buildContext();
+          const res = await fetch('/explain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phrase: q, dbUrl, context })
+          });
+          const data = await res.json().catch(() => null);
+          chatEl.removeChild(thinking);
+          if (!res.ok || !data || typeof data.answer !== 'string') {
+            const msg = data && data.error ? data.error : (i18n[lang].unexpected);
+            chatHistory.push({ role: 'assistant', content: msg });
+            appendMsg('assistant', msg);
+            return;
+          }
+          chatHistory.push({ role: 'assistant', content: data.answer });
+          appendMsg('assistant', data.answer);
+          saveChat();
+        } catch (err) {
+          chatEl.removeChild(thinking);
+          const msg = i18n[lang].errPrefix + (err && err.message ? err.message : String(err));
+          chatHistory.push({ role: 'assistant', content: msg });
+          appendMsg('assistant', msg);
+          saveChat();
+        }
+      });
+
+      // Load chat initially
+      loadChat();
+
+      // Clear chat
+      clearBtn.addEventListener('click', () => {
+        chatHistory = [];
+        try { localStorage.removeItem(STORAGE_KEY); } catch {}
+        renderChatFromHistory();
+      });
+
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const t = i18n[lang];
@@ -191,4 +353,3 @@
     </script>
   </body>
   </html>
-

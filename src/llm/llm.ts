@@ -13,7 +13,7 @@ export interface ExplainResult {
 
 export interface LLM {
   generateSQL(phrase: string, cards: RelationCard[], cardNames: string[]): Promise<LLMResult>;
-  generateExplanation(phrase: string, cards: RelationCard[], cardNames: string[]): Promise<ExplainResult>;
+  generateExplanation(phrase: string, cards: RelationCard[], cardNames: string[], context?: string): Promise<ExplainResult>;
 }
 
 const SYSTEM_PROMPT_TEMPLATE = (
@@ -104,13 +104,14 @@ export class OpenAILLM implements LLM {
     return { sql: parsed.sql, params: parsed.params ?? [] };
   }
 
-  async generateExplanation(phrase: string, cards: RelationCard[], cardNames: string[]): Promise<ExplainResult> {
+  async generateExplanation(phrase: string, cards: RelationCard[], cardNames: string[], context?: string): Promise<ExplainResult> {
     const sys = SYSTEM_EXPLAIN_TEMPLATE(cardNames, JSON.stringify(cards));
     const body = {
       model: this.model,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: sys },
+        ...(context && context.trim() ? [{ role: "system" as const, content: `Conversation so far:\n${context.trim()}` }] : []),
         { role: "user", content: phrase },
       ],
     };
@@ -157,7 +158,7 @@ export class MockLLM implements LLM {
     return { sql, params: [] };
   }
 
-  async generateExplanation(phrase: string, cards: RelationCard[], cardNames: string[]): Promise<ExplainResult> {
+  async generateExplanation(phrase: string, cards: RelationCard[], cardNames: string[], context?: string): Promise<ExplainResult> {
     const lower = phrase.toLowerCase();
     // Try to find a referenced relation by name substring
     const pickByMention = cards.find(c => lower.includes(c.name.split('.').pop() || c.name));

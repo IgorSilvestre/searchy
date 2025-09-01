@@ -85,7 +85,7 @@ POST `/explain`
 
 Request:
 ```
-{ "phrase": "how do orders link to customers?", "dbUrl": "postgres://user:pass@host:5432/db" }
+{ "phrase": "how do orders link to customers?", "dbUrl": "postgres://user:pass@host:5432/db", "context": "Q: what tables exist? A: public.orders, public.customers" }
 ```
 
 Response:

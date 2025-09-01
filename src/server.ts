@@ -114,6 +114,7 @@ export function createApp() {
       const { phrase } = req.body as QueryRequest;
       const dbUrl = (req.body as QueryRequest).dbUrl || PG_URL;
       if (!dbUrl) throw Object.assign(new Error("Missing dbUrl"), { status: 400 });
+      const context = typeof (req.body as any).context === 'string' ? String((req.body as any).context).slice(0, 5000) : undefined;
 
       const adapter = getAdapter(dbUrl);
       await adapter.testConnection();
@@ -131,7 +132,7 @@ export function createApp() {
       const selectedNames = selected.map((c) => c.name);
 
       const llm = getLLM();
-      const { answer, references } = await llm.generateExplanation(phrase, selected, selectedNames);
+      const { answer, references } = await llm.generateExplanation(phrase, selected, selectedNames, context);
 
       const response: ExplainResponse = { answer };
       if (references && Array.isArray(references) && references.length > 0) {
