@@ -1,6 +1,8 @@
 # Searchy
 
-Plug-and-play NL→SQL API. ExpressJS + TypeScript, Bun, Postgres-first with an adapter interface for future databases. It exposes a single REST endpoint that takes a natural-language phrase, generates a safe SELECT-only SQL using an LLM (OpenAI-compatible JSON mode), executes it with guardrails, and returns JSON rows.
+Plug-and-play NL→SQL API. ExpressJS + TypeScript, Bun, Postgres-first with an adapter interface for future databases. It exposes two REST endpoints:
+- `/query` – takes a natural-language phrase, generates a safe SELECT-only SQL using an LLM (OpenAI-compatible JSON mode), executes it with guardrails, and returns JSON rows.
+- `/explain` – takes the same body and returns a concise explanation answering schema/relationship questions about your DB (no SQL is generated or executed).
 
 ```
 Architecture
@@ -65,7 +67,7 @@ docker-compose up --build
 # API on :7679; DB on :5432; read-only role: app_ro/app_ro_pass
 ```
 
-## Endpoint
+## Endpoints
 
 POST `/query`
 
@@ -77,6 +79,18 @@ Request:
 Response:
 ```
 { "rows": [...], "rowCount": 123, "sql": "SELECT ... LIMIT 1000" }
+```
+
+POST `/explain`
+
+Request:
+```
+{ "phrase": "how do orders link to customers?", "dbUrl": "postgres://user:pass@host:5432/db" }
+```
+
+Response:
+```
+{ "answer": "orders.customer_id references customers.id", "references": ["public.orders","public.customers"] }
 ```
 
 ## Security Defaults
@@ -104,7 +118,8 @@ Add a file like `src/adapters/mysql.ts` implementing the interface and wire `get
 
 `src/llm/llm.ts` provides a provider-agnostic interface. Default is OpenAI-compatible JSON mode with `temperature: 0`. For tests/dev, enable `MOCK_LLM=1` to avoid network calls.
 
-System prompt template is stable and embeds top-K Relation Cards with hard rules (SELECT-only, join_hints, LIMIT<=1000, schema-qualified names) and requires strict JSON output: `{"sql":"...","params":[...]}`.
+- For `/query`, the system prompt embeds top-K Relation Cards with hard rules (SELECT-only, join_hints, LIMIT<=1000, schema-qualified names) and requires strict JSON output: `{"sql":"...","params":[...]}`.
+- For `/explain`, the system prompt focuses on schema/relationship explanations and requires strict JSON output: `{"answer":"...","references":[...]}`.
 
 ## Tests
 
@@ -112,6 +127,7 @@ Run: `bun test`
 
 - `tests/unit.guard.test.ts` – SQL guard behavior
 - `tests/e2e.query.test.ts` – Spins an Express server and hits `/query`. Uses `MOCK_LLM=1`. Requires `TEST_PG_URL` or `PG_URL` to be set; otherwise skips.
+- `tests/e2e.explain.test.ts` – Spins an Express server and hits `/explain`. Uses `MOCK_LLM=1`. Requires `TEST_PG_URL` or `PG_URL` to be set; otherwise skips.
 
 ## Pragmatic choices
 

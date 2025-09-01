@@ -7,7 +7,7 @@ import { buildCards } from "./schema/cards";
 import { pickTopK } from "./schema/rag";
 import { ensureLimit, hasRandomOrder, isSafeSelect, limitValue } from "./guards/sqlGuard";
 import { getLLM } from "./llm/llm";
-import type { QueryRequest, QueryResponse } from "./types";
+import type { QueryRequest, QueryResponse, ExplainResponse } from "./types";
 import { errorHandler } from "./middleware/error";
 
 // Validations
@@ -100,6 +100,46 @@ export function createApp() {
 
       const durationMs = Date.now() - started;
       logger.info("query_ok", { phrase, chosenCards: selectedNames, sql: limitedSql, rowCount, durationMs });
+
+      res.json(response);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post("/explain", async (req, res, next) => {
+    const started = Date.now();
+    try {
+      validateBody(req.body);
+      const { phrase } = req.body as QueryRequest;
+      const dbUrl = (req.body as QueryRequest).dbUrl || PG_URL;
+      if (!dbUrl) throw Object.assign(new Error("Missing dbUrl"), { status: 400 });
+
+      const adapter = getAdapter(dbUrl);
+      await adapter.testConnection();
+
+      let entry = cardsCache.get(dbUrl);
+      const now = Date.now();
+      const ttlMs = CARDS_TTL_SECONDS * 1000;
+      if (!entry || now - entry.ts > ttlMs) {
+        const cards = await buildCards(adapter);
+        entry = { ts: now, cards };
+        cardsCache.set(dbUrl, entry);
+      }
+      const cards = entry.cards;
+      const selected = pickTopK(cards, phrase, 6);
+      const selectedNames = selected.map((c) => c.name);
+
+      const llm = getLLM();
+      const { answer, references } = await llm.generateExplanation(phrase, selected, selectedNames);
+
+      const response: ExplainResponse = { answer };
+      if (references && Array.isArray(references) && references.length > 0) {
+        (response as any).references = references;
+      }
+
+      const durationMs = Date.now() - started;
+      logger.info("explain_ok", { phrase, chosenCards: selectedNames, durationMs });
 
       res.json(response);
     } catch (err) {

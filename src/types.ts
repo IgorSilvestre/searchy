@@ -10,3 +10,7 @@ export type QueryResponse = {
   truncated?: boolean;
 };
 
+export type ExplainResponse = {
+  answer: string;
+  references?: string[];
+};
